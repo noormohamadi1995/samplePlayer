@@ -1,6 +1,5 @@
 package ir.noormohammadi.sampleplayer.data.repository
 
-import android.provider.MediaStore
 import ir.noormohammadi.sampleplayer.data.source.MediaDataSource
 import ir.noormohammadi.sampleplayer.domain.model.Media
 import ir.noormohammadi.sampleplayer.domain.repository.MediaRepository
