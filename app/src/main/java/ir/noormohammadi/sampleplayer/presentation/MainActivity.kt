@@ -52,7 +52,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        mediaAdapter = MediaAdapter(emptyList())
+        mediaAdapter = MediaAdapter()
         val spacingInPixels = resources.getDimensionPixelSize(R.dimen.grid_spacing)
         mBinding.recyclerViewMedia.apply {
             setHasFixedSize(true)
@@ -67,13 +67,18 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        viewModel.mediaList.observe(this) {
-            mediaAdapter.updateData(it)
+        viewModel.mediaItems.observe(this) {
+            mediaAdapter.submitList(it)
         }
     }
 
     override fun onStart() {
         viewModel.loadMedia()
         super.onStart()
+    }
+
+    override fun onDestroy() {
+        mediaAdapter.releasePlayer()
+        super.onDestroy()
     }
 }
