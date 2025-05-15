@@ -1,22 +1,26 @@
 package ir.noormohammadi.sampleplayer.data.repository
 
-import ir.noormohammadi.sampleplayer.domain.repository.MediaRepository
 import android.content.ContentUris
 import android.content.Context
 import android.graphics.Bitmap
-import android.media.MediaMetadataRetriever
+import android.graphics.BitmapFactory
+import android.media.ThumbnailUtils
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
-import java.io.FileNotFoundException
-import java.io.FileOutputStream
+import android.util.Size
+import ir.noormohammadi.sampleplayer.data.model.MediaItem
 import ir.noormohammadi.sampleplayer.domain.model.Media
+import ir.noormohammadi.sampleplayer.domain.repository.MediaRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.core.graphics.scale
 
 
 class MediaRepositoryImpl(private val context: Context) : MediaRepository {
-    override suspend fun getAllMedia(): List<Media> {
+    override suspend fun getAllMedia(): List<Media> = withContext(Dispatchers.IO) {
         val mediaList = mutableListOf<Media>()
-        val uri = MediaStore.Files.getContentUri("external")
+        val collection = MediaStore.Files.getContentUri("external")
 
         val projection = arrayOf(
             MediaStore.Files.FileColumns._ID,
@@ -29,15 +33,21 @@ class MediaRepositoryImpl(private val context: Context) : MediaRepository {
             MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString()
         )
 
+        val sortOrder = "${MediaStore.Files.FileColumns.DATE_ADDED} DESC"
+
         context.contentResolver.query(
-            uri, projection, selection, selectionArgs, "${MediaStore.Files.FileColumns.DATE_ADDED} DESC"
+            collection,
+            projection,
+            selection,
+            selectionArgs,
+            sortOrder
         )?.use { cursor ->
-            val idCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
-            val typeCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE)
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
+            val mediaTypeColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE)
 
             while (cursor.moveToNext()) {
-                val id = cursor.getLong(idCol)
-                val mediaType = cursor.getInt(typeCol)
+                val id = cursor.getLong(idColumn)
+                val mediaType = cursor.getInt(mediaTypeColumn)
                 val isVideo = mediaType == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO
 
                 val contentUri = if (isVideo) {
@@ -46,54 +56,60 @@ class MediaRepositoryImpl(private val context: Context) : MediaRepository {
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI
                 }
 
-                val mediaUri = ContentUris.withAppendedId(contentUri, id)
-                val thumbnailUri = generateThumbnail(mediaUri, isVideo)
-
-                mediaList.add(Media(uri = mediaUri, thumbnailUri = thumbnailUri, isVideo = isVideo))
+                val uri = ContentUris.withAppendedId(contentUri, id)
+                val thumbnail = getThumbnail(uri, isVideo)
+                mediaList.add(Media(uri, thumbnail = thumbnail, isVideo = isVideo))
             }
         }
-
-        return mediaList
+        mediaList
     }
 
-    // متد ایجاد Thumbnail به صورت دستی
-    private fun generateThumbnail(mediaUri: Uri, isVideo: Boolean): Uri {
-        return try {
-            val thumbnailBitmap = if (isVideo) {
-                getVideoThumbnail(mediaUri)
+    // متد بهینه دریافت Thumbnail (تصویر کوچک)
+    private fun getThumbnail(uri: Uri, isVideo: Boolean): Bitmap? {
+        val thumbnailSize = Size(200, 200) // اندازه ثابت برای همه‌ی Thumbnailها
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                context.contentResolver.loadThumbnail(uri, thumbnailSize, null)
+            } catch (e: Exception) {
+                null
+            }
+        } else {
+            if (isVideo) {
+                getVideoThumbnail(uri, thumbnailSize)
             } else {
-                getImageThumbnail(mediaUri)
+                getImageThumbnail(uri, thumbnailSize)
             }
+        }
+    }
 
-            saveThumbnailToCache(thumbnailBitmap)
+    // دریافت Thumbnail برای ویدیوها (نسخه‌های پایین‌تر)
+    private fun getVideoThumbnail(uri: Uri, size: Size): Bitmap? {
+        val filePath = getFilePath(uri)
+        return filePath?.let {
+            ThumbnailUtils.createVideoThumbnail(it, MediaStore.Video.Thumbnails.MINI_KIND)
+                ?.scale(size.width, size.height)
+        }
+    }
+
+    // دریافت Thumbnail برای تصاویر (نسخه‌های پایین‌تر)
+    private fun getImageThumbnail(uri: Uri, size: Size): Bitmap? {
+        val filePath = getFilePath(uri)
+        return filePath?.let {
+            BitmapFactory.decodeFile(it)?.scale(size.width, size.height)
+        }
+    }
+
+    // دریافت مسیر فایل برای نسخه‌های پایین‌تر
+    private fun getFilePath(uri: Uri): String? {
+        return try {
+            val projection = arrayOf(MediaStore.Files.FileColumns.DATA)
+            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                val dataIndex = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)
+                if (cursor.moveToFirst()) cursor.getString(dataIndex) else null
+            }
         } catch (e: Exception) {
-            mediaUri // اگر Thumbnail ایجاد نشد، URI اصلی بازگردانده می‌شود
+            null
         }
-    }
-
-    // ایجاد Thumbnail برای تصاویر
-    private fun getImageThumbnail(uri: Uri): Bitmap {
-        return context.contentResolver.openInputStream(uri)?.use {
-            MediaStore.Images.Media.getBitmap(context.contentResolver, uri).scale(200, 200)
-        } ?: throw FileNotFoundException("Image not found")
-    }
-
-    // ایجاد Thumbnail برای ویدیوها
-    private fun getVideoThumbnail(uri: Uri): Bitmap {
-        val retriever = MediaMetadataRetriever()
-        retriever.setDataSource(context, uri)
-        return retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST)!!.run {
-            this.scale(200, 200)
-        }
-    }
-
-    // ذخیره‌ی Bitmap به عنوان فایل کش و بازگرداندن URI آن
-    private fun saveThumbnailToCache(bitmap: Bitmap): Uri {
-        val cacheDir = context.cacheDir
-        val thumbnailFile = java.io.File(cacheDir, "thumb_${System.currentTimeMillis()}.jpg")
-        FileOutputStream(thumbnailFile).use { fos ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, fos)
-        }
-        return Uri.fromFile(thumbnailFile)
     }
 }

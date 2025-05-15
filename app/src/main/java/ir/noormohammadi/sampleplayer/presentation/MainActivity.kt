@@ -6,8 +6,10 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import com.permissionx.guolindev.PermissionX
+import ir.noormohammadi.sampleplayer.R
 import ir.noormohammadi.sampleplayer.databinding.ActivityMainBinding
 import ir.noormohammadi.sampleplayer.presentation.adapter.MediaAdapter
+import ir.noormohammadi.sampleplayer.presentation.view.GridSpacingItemDecoration
 import ir.noormohammadi.sampleplayer.presentation.viewModel.MediaViewModel
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
@@ -51,9 +53,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         mediaAdapter = MediaAdapter(emptyList())
+        val spacingInPixels = resources.getDimensionPixelSize(R.dimen.grid_spacing)
         mBinding.recyclerViewMedia.apply {
+            setHasFixedSize(true)
             layoutManager = GridLayoutManager(this@MainActivity, 4)
             adapter = mediaAdapter
+            addItemDecoration(
+                GridSpacingItemDecoration(
+                    spanCount = 4, // تعداد ستون‌ها
+                    spacing = spacingInPixels, // فاصله بین آیتم‌ها
+                    includeEdge = true // اعمال فاصله در لبه‌های گرید
+                )
+            )
         }
 
         viewModel.mediaList.observe(this) {

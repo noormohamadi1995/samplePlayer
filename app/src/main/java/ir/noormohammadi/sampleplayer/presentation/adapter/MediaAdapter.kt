@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
+import coil.size.Scale
 import ir.noormohammadi.sampleplayer.databinding.ItemMediaBinding
 import ir.noormohammadi.sampleplayer.domain.model.Media
 
@@ -16,7 +17,11 @@ class MediaAdapter(
     inner class MediaViewHolder(private val binding: ItemMediaBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(media: Media) {
-            binding.imageViewThumbnail.load(media.thumbnailUri)
+            binding.imageViewThumbnail.load(media.thumbnail){
+                size(110,110)
+                scale(Scale.FIT)
+                crossfade(true)
+            }
             binding.videoIcon.visibility = if (media.isVideo) View.VISIBLE else View.GONE
         }
     }
