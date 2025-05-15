@@ -14,7 +14,10 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import coil.load
+import coil.request.CachePolicy
+import coil.size.Precision
 import coil.size.Scale
+import coil.size.Size
 import ir.noormohammadi.sampleplayer.R
 import ir.noormohammadi.sampleplayer.databinding.RecyclerviewImageItemBinding
 import ir.noormohammadi.sampleplayer.databinding.RecyclerviewVideoItemBinding
@@ -86,8 +89,12 @@ class MediaAdapter : ListAdapter<MediaDataModel, ViewHolder>(
 
             // لود تصویر
             imageThumbnail.load(media.thumbnail ?: media.uri) {
-                scale(Scale.FILL)
                 crossfade(true)
+                allowHardware(false)
+                precision(Precision.EXACT)
+                size(Size.ORIGINAL)
+                memoryCachePolicy(CachePolicy.ENABLED)
+                diskCachePolicy(CachePolicy.DISABLED)
             }
 
             itemView.setOnClickListener {

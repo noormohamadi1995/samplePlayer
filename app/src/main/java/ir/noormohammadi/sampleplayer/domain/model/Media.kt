@@ -3,9 +3,17 @@ package ir.noormohammadi.sampleplayer.domain.model
 import android.graphics.Bitmap
 import android.net.Uri
 
-data class Media(
-    val uri : Uri,
-    val isVideo : Boolean,
-    val thumbnail: Bitmap?,
+sealed interface Media {
+    val uri: Uri
+    val thumbnail: Uri?
 
-    )
+    data class ImageMedia(
+        override val uri: Uri,
+        override val thumbnail: Uri?
+    ) : Media
+
+    data class VideoMedia(
+        override val uri: Uri,
+        override val thumbnail: Uri?
+    ) : Media
+}

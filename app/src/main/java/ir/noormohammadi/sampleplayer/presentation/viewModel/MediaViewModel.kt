@@ -5,6 +5,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import ir.noormohammadi.sampleplayer.domain.model.Media
 import ir.noormohammadi.sampleplayer.domain.usecase.LoadMediaUseCase
 import ir.noormohammadi.sampleplayer.presentation.data.MediaDataModel
 import kotlinx.coroutines.Dispatchers
@@ -18,17 +19,8 @@ class MediaViewModel(private val loadMediaUseCase: LoadMediaUseCase) : ViewModel
         viewModelScope.launch(Dispatchers.IO) {
             val mediaList = loadMediaUseCase.invoke()
             mediaList.map { media ->
-                if (media.isVideo) {
-                    MediaDataModel.Video(
-                        uri = media.uri,
-                        thumbnail = media.thumbnail,
-                        isPlaying = false,
-                        togglePlay = {
-                            toggleVideoPlay(uri = it)
-                        }
-                    )
-                } else {
-                    MediaDataModel.Image(
+                when (media) {
+                    is Media.ImageMedia -> MediaDataModel.Image(
                         uri = media.uri,
                         thumbnail = media.thumbnail,
                         isFiltered = false,
@@ -36,6 +28,16 @@ class MediaViewModel(private val loadMediaUseCase: LoadMediaUseCase) : ViewModel
                             toggleFilter(it)
                         }
                     )
+
+                    is Media.VideoMedia ->
+                        MediaDataModel.Video(
+                            uri = media.uri,
+                            thumbnail = media.thumbnail,
+                            isPlaying = false,
+                            togglePlay = {
+                                toggleVideoPlay(uri = it)
+                            }
+                        )
                 }
             }.let {
                 _mediaItems.postValue(it)
